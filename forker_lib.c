@@ -63,7 +63,6 @@ void wait_forker(int argc, char **argv)
 			// Collect the child process with max-runtime s.%09
 			if( i < argc ){
 				total = 1.0e3*(seconds + 1.0e-9*ns );
-				printf("TOTAL: %d",total);
 				printf("\nOUTPUT>>>\nRunning time: %ld (sec) + %ld (ns) = %d.%.3d (seconds) Total; from child: %d (pid); %s (command)\n",seconds, ns, (int) (total/1000), (int) (total%1000), cpid, argv[i]);
 			}
 			
