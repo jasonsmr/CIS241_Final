@@ -24,24 +24,50 @@ void wait_forker(int argc, char **argv)
 	//float total[argc];
     int i, stat;
     pid_t pid[argc];
+	int mypipefd[2];
+	int ret;
+	int buf[50];
+	//char *(buff)[50] = malloc(sizeof *buff);
+	// Instantiate the pipe file descriptor
+	ret = pipe(mypipefd);
+	int total = 0;
+	int max = 0;
+	int mcpid = 0;
 	
-	
-    for (i=1; i<argc; i++){ 
+	// Check if pipe error condition
+	if(ret == -1){
+		perror("ERROR in pipe");
+		exit(1);
+	}
+	// Loop to create arc No. of Child processes via the use of fork()
+    for (i=1; i<argc; i++){
+		// Child Process Conditional to Do stuff here if its pid is a Child process pid = 0
         if ((pid[i] = fork()) == 0){
+			// Secure Leaks 0 is for parent process (read); 1 is for child process(write)
+			close(mypipefd[0]);
+			// Get the child process PID
 			int cpid = getpid();
+			// All other child process variables for time keeping
 			int total = 0;
 			int statusArr;
 			long seconds;
 			long ns;
 			struct timespec start, finish;
+			// Start clock
 			clock_gettime(CLOCK_REALTIME, &start);
+			
+			// All these char type variables are for concatenating my command line string with  >/dev/null 2>&1
 			char *foo = argv[i];
 			char *bar = " >/dev/null 2>&1";
 			char str[80];
 			strcpy(str, "");
 			strcat(str, foo);
 			strcat(str, bar);
+			
+			// Run command itself using system() a wrapper for execv()
             statusArr = system(str);
+			
+			// If there is an error in the command returned from linux tell the user.
 			if( statusArr != 0){
 				printf("\nERROR:{%s} is Not a valid Unix/Linux Command!!\nPlease enter valid Unix/Linux command argument in double-quotes.\nUsage: %s \"Unix/Linux Command\"\nExample: %s \"ls -l\" \"sleep 1\" \n", argv[i], argv[0], argv[0]);
 				exit(-1);
@@ -64,37 +90,44 @@ void wait_forker(int argc, char **argv)
 			if( i < argc ){
 				total = 1.0e3*(seconds + 1.0e-9*ns );
 				printf("\nOUTPUT>>>\nRunning time: %ld (sec) + %ld (ns) = %d.%.3d (seconds) Total; from child: %d (pid); %s (command)\n",seconds, ns, (int) (total/1000), (int) (total%1000), cpid, argv[i]);
+				
+				printf("\nFROM CHILD PROCESS No. %d TOTAL PTIME: %d\n", i, total);
+				write(mypipefd[1], total, 4);
 			}
 			
-			//finally return seconds through the exit code
-            exit(seconds & 0xff); 
-        } 
-    } 
-  
+			// Finally return seconds through the exit code
+            exit(i +1); 
+        }
+		else{
+			// Parent Process
+			close(mypipefd[1]);
+			
+			
+			printf("\n");
+			pid_t cpid = waitpid(pid[i], &stat, 0);
+		
+			if (WIFEXITED(stat)){
+				int exit = WEXITSTATUS(stat);
+				if(cpid > 0){
+				read(mypipefd[0], total, 4);
+				printf("\nFROM PARENT PROCESS No. %d TOTAL PTIME: %d\n", i, total);
+				}
+			}
+
+		}
+    }
+	
     // Using waitpid() and printing exit status 
     // of children. 
-	int total = 0;
-	int max = 0;
-	int mcpid = 0;
+	
+	
+	
+	
+	
     for (i=1; i<argc; i++){
-        pid_t cpid = waitpid(pid[i], &stat, 0);
-		
-        if (WIFEXITED(stat)){
-			int exit = WEXITSTATUS(stat);
-			if(cpid > 0){
-				//Itterate through all exit status seconds run time for each child
-				//If greater thatn current Total that child become the newet winner 
-				//In the Longest Runtime child process race.
-				if(max <= exit){
-					max = exit;
-					mcpid = cpid;
-				}
-				//tally up all totals
-				total += exit;
-				printf("\nChild %d terminated with time: %d (sec)\n",
-                   cpid, exit);
-			}
-		}
+        
+				//printf("No. %d Process Total time: %d\n", i, buf[i]);
+
     }
 	printf("\nThe child process with the Longest Run-Time: %d (pid) At: %d (seconds)\n", mcpid, max);
 	printf("\nThe Total Runtime of All Program(s): %d (seconds)\n", total); 
